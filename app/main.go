@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -50,8 +51,33 @@ func main() {
 			continue
 		}
 
-		fmt.Println(name + ": not found")
+		if err := runExternal(name, args); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+		}
 	}
+}
+
+func runExternal(name string, args []string) error {
+	cmd := exec.Command(name, args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		var ee *exec.Error
+		if errors.As(err, &ee) && ee.Err == exec.ErrNotFound {
+			fmt.Println(name + ": not found")
+			return nil
+		}
+
+		if _, ok := err.(*exec.ExitError); ok {
+			return nil
+		}
+
+		return fmt.Errorf("%s: execution failed: %v", name, err)
+	}
+
+	return nil
 }
 
 func exitCmd(args []string) error {
