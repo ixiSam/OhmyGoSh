@@ -4,37 +4,88 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
+type commandFunc func(args []string) error
+
+var commands map[string]commandFunc
+
 func main() {
+	commands = map[string]commandFunc{
+		"exit": exitCmd,
+		"echo": echoCmd,
+		"type": typeCmd,
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+
 	for {
 		fmt.Print("$ ")
-		cmd, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		line, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "Error reading command:", err)
 			return
 		}
-		if cmd == "exit\n" {
-			return
-		}
-		if strings.HasPrefix(cmd, "echo ") {
-			input := cmd[len("echo ") : len(cmd)-1]
-			fmt.Println(input)
+
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
 			continue
 		}
 
-		if strings.HasPrefix(cmd, "type ") {
-			arg := strings.TrimSpace(cmd[len("type "):])
+		fields := strings.Fields(trimmed)
+		if len(fields) == 0 {
+			continue
+		}
 
-			switch arg {
-			case "exit", "echo", "type":
-				fmt.Println(arg + " is a shell builtin")
-			default:
-				fmt.Println(arg + " not found")
+		name := fields[0]
+		args := fields[1:]
+
+		if cmdFn, ok := commands[name]; ok {
+			if err := cmdFn(args); err != nil {
+				fmt.Fprintln(os.Stderr, "Error:", err)
 			}
 			continue
 		}
-		fmt.Println(cmd[:len(cmd)-1] + ": not found")
+
+		fmt.Println(name + ": not found")
 	}
+}
+
+func exitCmd(args []string) error {
+	if len(args) == 0 {
+		os.Exit(0)
+	}
+
+	status, err := strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "exit: numeric argument required")
+		os.Exit(1)
+	}
+
+	os.Exit(status)
+	return nil
+}
+
+func echoCmd(args []string) error {
+	fmt.Println(strings.Join(args, " "))
+	return nil
+}
+
+func typeCmd(args []string) error {
+	if len(args) == 0 {
+		fmt.Println("Received no args")
+		return nil
+	}
+
+	name := args[0]
+
+	if _, ok := commands[name]; ok {
+		fmt.Println(name + " is a shell builtin")
+		return nil
+	}
+
+	fmt.Println(name + " not found")
+	return nil
 }
