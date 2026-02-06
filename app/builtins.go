@@ -10,20 +10,21 @@ import (
 
 func defaultBuiltins(s *Shell) map[string]CommandFunc {
 	return map[string]CommandFunc{
-		"exit": exitCmd,
-		"echo": echoCmd,
+		"exit": s.exitCmd,
+		"echo": s.echoCmd,
 		"type": s.typeCmd,
+		"pwd":  s.pwdCmd,
 	}
 }
 
-func exitCmd(args []string) error {
+func (s *Shell) exitCmd(args []string) error {
 	if len(args) == 0 {
 		os.Exit(0)
 	}
 
 	status, err := strconv.Atoi(args[0])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "exit: numeric argument required")
+		fmt.Fprintln(s.err, "exit: numeric argument required")
 		os.Exit(1)
 	}
 
@@ -31,14 +32,14 @@ func exitCmd(args []string) error {
 	return nil
 }
 
-func echoCmd(args []string) error {
-	fmt.Println(strings.Join(args, " "))
+func (s *Shell) echoCmd(args []string) error {
+	fmt.Fprintln(s.out, strings.Join(args, " "))
 	return nil
 }
 
 func (s *Shell) typeCmd(args []string) error {
 	if len(args) == 0 {
-		fmt.Fprintln(s.out, "Received no args")
+		fmt.Fprintln(s.err, "Received no args")
 		return nil
 	}
 
@@ -54,6 +55,16 @@ func (s *Shell) typeCmd(args []string) error {
 		return nil
 	}
 
-	fmt.Fprintln(s.out, name+" not found")
+	fmt.Fprintln(s.err, name+" not found")
+	return nil
+}
+
+func (s *Shell) pwdCmd(args []string) error {
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(s.err, "Error getting dir: %v \n", err)
+		return err
+	}
+	fmt.Fprintln(s.out, pwd)
 	return nil
 }
