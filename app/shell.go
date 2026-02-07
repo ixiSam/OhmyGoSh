@@ -32,35 +32,39 @@ func NewShell(in io.Reader, out, err io.Writer) *Shell {
 
 func (s *Shell) Run() error {
 	for {
-		fmt.Fprint(s.out, "OhmyGosh$ ")
+		fmt.Fprint(s.out, "OhmyGoSh$ ")
 
 		line, err := s.reader.ReadString('\n')
 		if err != nil {
+			if err == io.EOF {
+				return nil // Exit gracefully on Ctrl+D
+			}
 			fmt.Fprintln(s.err, "Error reading command:", err)
 			return err
 		}
 
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" {
+		line = strings.TrimSuffix(line, "\n")
+		args, err := parseArgs(line)
+		if err != nil {
+			fmt.Fprintln(s.err, "Error:", err)
 			continue
 		}
 
-		fields := strings.Fields(trimmed)
-		if len(fields) == 0 {
+		if len(args) == 0 {
 			continue
 		}
 
-		name := fields[0]
-		args := fields[1:]
+		name := args[0]
+		cmdArgs := args[1:]
 
 		if cmdFn, ok := s.commands[name]; ok {
-			if err := cmdFn(args); err != nil {
+			if err := cmdFn(cmdArgs); err != nil {
 				fmt.Fprintln(s.err, "Error:", err)
 			}
 			continue
 		}
 
-		if err := runExternal(name, args, s.in, s.out, s.err); err != nil {
+		if err := runExternal(name, cmdArgs, s.in, s.out, s.err); err != nil {
 			fmt.Fprintln(s.err, "Error:", err)
 		}
 	}
